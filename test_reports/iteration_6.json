@@ -1,0 +1,46 @@
+{
+  "summary": "Verified iteration-7 bug fix (cert count 37) and re-uploaded videos. Cert count fix WORKS end-to-end. Video playback for the 4 re-uploaded background videos (skills, certifications, contact, activity) is BROKEN in the browser due to incompatible container/codec of the uploaded source files (not a code bug).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/uploads/videos/*.mp4", "issue": "Response missing 'Accept-Ranges: bytes' and returns HTTP 200 (not 206) for Range requests. FastAPI StaticFiles + Cloudflare edge do not honor byte-range on these responses; also 'Cache-Control: no-store' disables edge caching. This forces the browser to download the entire file (up to 57 MB) before playback and prevents seek. Recommend serving videos with a Range-aware handler (e.g., custom StreamingResponse honoring Range) or moving them to a CDN/object store."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "VideoBackground (all 4 pages)", "issue": "The 4 re-uploaded videos fail to play. HTMLMediaElement reports: 'PipelineStatus::DEMUXER_ERROR_NO_SUPPORTED_STREAMS: FFmpegDemuxer: no supported streams'. readyState stays 0, currentTime stays 0, paused=true after 20+ seconds. The <video> tag is correctly wired (autoPlay/loop/muted/playsInline, src matches /api/uploads/videos/{slug}.mp4, HTTP 200 served) — the failure is inside the media decode pipeline.", "selector": "video", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/backend/tests/test_iteration5.py",
+    "/app/backend/tests/test_iteration6.py"
+  ],
+  "action_items": [
+    "Re-encode the 4 uploaded videos to browser-compatible MP4 (H.264 baseline/main + AAC, container ftyp='mp42'/'isom'). Root cause: 3 of 4 files are QuickTime containers (ftyp='qt  ') renamed to .mp4 which Chromium/Firefox refuse to demux; skills.mp4 has ftyp='isom/avc1' but the internal codec/profile still fails DEMUXER on Chromium. See RCA section.",
+    "Add server-side validation on video upload endpoint to (a) inspect ftyp box and reject non-'mp42/isom/iso2' containers, or (b) transcode with ffmpeg to H.264+AAC MP4 on ingest.",
+    "Add Range-request support to /api/uploads/videos/* (custom StreamingResponse) so large videos begin playback progressively instead of downloading in full.",
+    "Optional: remove 'Cache-Control: no-store' from static video responses to allow CDN caching."
+  ],
+  "critical_code_review_comments": [
+    "VideoBackground.jsx has no onError handler — silent failures for users. Add an onError that logs and/or falls back to poster image only.",
+    "Consider adding <source type='video/mp4; codecs=avc1.42E01E,mp4a.40.2'> so the browser can early-reject incompatible files and pick alternates.",
+    "Video upload endpoint (admin CMS) does not appear to validate MIME/codec — allowed a .mov-inside-mp4 to be persisted."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "60% (cert-count fix passes; 4 video backgrounds fail to play)"},
+  "test_credentials": "not needed for this run",
+  "seed_data_creation": "none",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Cert count fix is confirmed: /api/certifications returns 37; home hero-stat-certifications shows '37'; certifications page header shows '// 37 credentials verified'. Video files at /app/backend/uploads/videos/{skills,certifications,contact,activity}.mp4 need to be re-encoded before video playback tests can pass. Working reference: home.mp4/summary.mp4/education.mp4/experience.mp4 have ftyp='mp42/isom/avc1' and play fine.",
+  "rca of the issue": {
+    "symptom": "Background video is invisible on /skills, /certifications, /contact, /activity even though the <video> element is present with correct attributes and the file returns HTTP 200.",
+    "evidence": "In-browser HTMLMediaElement.error.message = 'PipelineStatus::DEMUXER_ERROR_NO_SUPPORTED_STREAMS: FFmpegDemuxer: no supported streams'. video.readyState=0, video.networkState=3 (NETWORK_NO_SOURCE) after 20s.",
+    "root_cause": "The re-uploaded files are not standards-compliant MP4/H.264. Inspection of the ftyp box: certifications.mp4/contact.mp4/activity.mp4 = 'qt  ' (Apple QuickTime .mov container renamed to .mp4). skills.mp4 = 'isom/iso2/avc1/mp41' — container is fine but Chromium still fails to demux, suggesting the codec profile inside (likely HEVC/ProRes or non-standard AVC profile) is unsupported. Compare with the previously-working home.mp4 which shows ftyp='mp42/isom/avc1'.",
+    "reproduction": "1) curl -sI https://.../api/uploads/videos/contact.mp4  -> 200 OK, 12 MB.  2) Open /contact in Chrome, check document.querySelector('video').error -> DEMUXER_ERROR_NO_SUPPORTED_STREAMS.  3) hexdump -C /app/backend/uploads/videos/contact.mp4 | head -1 -> shows 'ftypqt  ' (QuickTime).",
+    "mitigation": "Re-encode the four files on ingest: ffmpeg -i input -c:v libx264 -profile:v main -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k output.mp4. Also add a validation step on the admin upload endpoint that rejects non-mp42/isom ftyp or auto-transcodes."
+  }
+}

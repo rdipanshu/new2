@@ -1,0 +1,10 @@
+{
+  "name": "portfolio-website",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install-deps": "npm --prefix frontend install --legacy-peer-deps",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend start"
+  }
+}

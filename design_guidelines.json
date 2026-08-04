@@ -1,0 +1,115 @@
+{
+  "theme": "Professional, sleek, tech-focused, and dark-mode oriented.",
+  "archetype": "The Performance Pro mixed with Electric & Neon (Cybersecurity specific)",
+  "typography": {
+    "headings": {
+      "font_family": "Outfit, sans-serif",
+      "classes": "font-sans tracking-tight text-white",
+      "usage": "Use for all H1, H2, H3 elements to maintain a clean, authoritative geometric tech look. Do not use Inter for headings."
+    },
+    "body": {
+      "font_family": "Inter, sans-serif",
+      "classes": "font-sans text-zinc-400 leading-relaxed",
+      "usage": "Primary readable text for descriptions, paragraphs, and admin dashboard data."
+    },
+    "accents_and_code": {
+      "font_family": "JetBrains Mono, monospace",
+      "classes": "font-mono text-cyan-400 tracking-wider uppercase",
+      "usage": "Use for overlines, small labels, skill tags, metadata, and 'hacker/tech' vibe accents."
+    }
+  },
+  "colors": {
+    "background": {
+      "base": "bg-zinc-950",
+      "overlay": "bg-black/60",
+      "glass": "bg-zinc-950/70 backdrop-blur-xl border border-white/10"
+    },
+    "surfaces": {
+      "card_default": "bg-zinc-900 border border-zinc-800",
+      "card_hover": "hover:bg-zinc-800/80 hover:border-cyan-500/50 transition-colors duration-300"
+    },
+    "accents": {
+      "primary": "cyan-400",
+      "primary_hex": "#22d3ee",
+      "secondary": "emerald-400",
+      "secondary_hex": "#34d399",
+      "danger": "red-500",
+      "warning": "amber-400"
+    },
+    "text": {
+      "primary": "text-white",
+      "secondary": "text-zinc-400",
+      "accent": "text-cyan-400"
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": "CRITICAL: Since every page has a video background, all readable content containers MUST be wrapped in glassmorphism (bg-zinc-950/70 backdrop-blur-2xl border border-white/10). Never use fully transparent backgrounds for content areas.",
+    "glow_effects": "Use subtle drop shadows on primary buttons or active states, e.g., shadow-[0_0_15px_rgba(34,211,238,0.4)]. Do not overuse.",
+    "borders": "1px sharp borders. Keep border radius minimal (rounded-md or rounded-none) for a 'strict/secure' technical aesthetic."
+  },
+  "layouts": {
+    "global": "Mobile-first responsive grids. Use generous spacing (p-8, p-12) within glass panels to give content breathing room against the video backgrounds.",
+    "home_hero": "Center-aligned massive text (text-5xl md:text-7xl) with a glowing CTA. Add a subtle typing animation or terminal-like cursor to the heading.",
+    "skills": "Bento-style CSS grid for the 9 categories. Mix grid-span to avoid monotonous perfect squares.",
+    "certifications": "Masonry/CSS Grid (grid-cols-1 md:grid-cols-2 xl:grid-cols-3) to cleanly handle the 39 items. Incorporate Shadcn Tabs for the 7 vendor categories.",
+    "experience": "Vertical timeline with a glowing cyan line on the left border. Each role is a card connected to the line via a glowing dot.",
+    "admin_dashboard": "Sidebar navigation (w-64, hidden on mobile). High density grid for content management tables. Distinctive from the public portfolio—prioritize functional clarity (no video background here, pure dark mode solid bg)."
+  },
+  "component_strategy": {
+    "buttons": "Sharp edges, flat colors. Primary: bg-cyan-500 text-black hover:bg-cyan-400. Secondary: border border-cyan-500 text-cyan-400 hover:bg-cyan-500/10.",
+    "tabs": "Use Shadcn Tabs for Certifications. Customize to look like terminal tabs or sharp active states.",
+    "cards": "For Skills, Experience, and Certifications, use a glassmorphism approach: bg-zinc-900/60 backdrop-blur-md border border-white/10. On hover, lift slightly (-translate-y-1) and illuminate border.",
+    "forms": "Use Shadcn Input, Textarea, Select. Customize with bg-black/50, border-zinc-700, focus:border-cyan-500."
+  },
+  "motion": {
+    "page_transitions": "Subtle opacity fades.",
+    "scroll_reveal": "Use Framer Motion to stagger-fade cards in the Skills and Certifications grids.",
+    "micro_interactions": "Buttons and links must have clear hover state transformations (color shift + subtle glow)."
+  },
+  "accessibility": {
+    "contrast": "Ensure text inside glassmorphism panels maintains at least a 4.5:1 contrast ratio. Use darker backgrounds (bg-zinc-950/80) if video behind is too bright.",
+    "focus": "All interactive elements must have a high-contrast focus ring (focus:ring-2 focus:ring-cyan-500 focus:outline-none).",
+    "motion_preference": "Respect prefers-reduced-motion CSS media query."
+  },
+  "media": {
+    "background_videos": "Implement HTML5 <video autoPlay loop muted playsInline className='fixed top-0 left-0 w-full h-full object-cover -z-10' />. Always apply a fixed black overlay (bg-black/50) over the video to guarantee text legibility.",
+    "fallback_images": "If video fails to load, use a dark abstract tech fallback background."
+  },
+  "image_urls": {
+    "hero_fallback_bg": {
+      "url": "https://images.unsplash.com/photo-1761599821310-da0d6356b4f3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGRpZ2l0YWwlMjBtYXRyaXglMjBjeWJlcnxlbnwwfHx8fDE3ODU3OTI3NTJ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Abstract green digital matrix cyber pattern. Use as video fallback."
+    },
+    "experience_bg": {
+      "url": "https://images.unsplash.com/photo-1695668548342-c0c1ad479aee?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwyfHxkYXJrJTIwZGF0YWNlbnRlciUyMHNlcnZlciUyMHJhY2t8ZW58MHx8fHwxNzg1NzkyNzUyfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Dark datacenter server rack. Use as decorative image in Summary or Experience section."
+    },
+    "profile_silhouette": {
+      "url": "https://images.unsplash.com/photo-1544502062-f82887f03d1c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA0MTJ8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjB0ZWNoJTIwcG9ydHJhaXQlMjBzaWxob3VldHRlfGVufDB8fHx8MTc4NTc5Mjc1Mnww&ixlib=rb-4.1.0&q=85",
+      "description": "Silhouette of a man. Use as a placeholder for Dipanshu Rana's profile picture until replaced in CMS."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Install required dependencies: framer-motion, @phosphor-icons/react (or lucide-react), clsx, tailwind-merge.",
+    "Set up Tailwind dark mode by default.",
+    "Implement the VideoBackground component first, taking a src prop, and placing it fixed behind all content with a bg-black/50 or bg-zinc-950/60 overlay to guarantee text legibility.",
+    "For the Admin CMS, strictly separate the visual theme. The admin should NOT have video backgrounds. It should be a clean, solid dark mode dashboard (bg-zinc-950) with sidebar navigation.",
+    "For Certifications, implement Shadcn Tabs for the 7 vendors (Anthropic, IBM, Cisco, Google, University of Helsinki, Amazon, Simplilearn) and use a responsive grid for the 39 items.",
+    "Create reusable GlassCard components that encapsulate the backdrop-blur, semi-transparent background, and 1px border. Use this for Skills, Experience, and Certifications.",
+    "Build the timeline component for Experience using a left-aligned border with dots. Position timeline items dynamically.",
+    "Ensure the Admin API handles text editing, video link updates, and full CRUD for certifications with file uploads. Add placeholders where actual file upload integration isn't fully implemented (mock if needed)."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "You MUST NOT apply universal transition. Eg: transition: all. Always add transitions for specific interactive elements.",
+    "You MUST NOT center align the app container. Do not add .App { text-align: center; }.",
+    "Always use modern button styles, sharp with interaction animations & color relevant to the app style.",
+    "NEVER use AI assistant Emoji characters like \ud83e\udd16\ud83e\udde0\ud83d\udcad\ud83d\udca1\ud83d\udd2e\ud83c\udfaf etc for icons. Use proper icon libraries.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations separate good from extraordinary.",
+    "All interactive and key informational elements MUST include a data-testid attribute."
+  ]
+}

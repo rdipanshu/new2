@@ -1,0 +1,40 @@
+{
+  "summary": "Iteration 3 tested new features: verify_url on certs, drag-and-drop reorder, cert lightbox, terminal-style 404. Backend: 5/6 new tests pass. Frontend: all new UI features work. One backend bug found: PUT /api/certifications/{id} with verify_url='' does NOT clear the field to null (FastAPI Optional[str]=Form(None) treats empty string as None, so the 'if verify_url is not None' branch is skipped and update never executes).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PUT /api/certifications/{id}", "issue": "Sending verify_url='' does not clear stored verify_url to null; the field remains unchanged. Root cause: Optional[str]=Form(None) coerces empty string to None, so `if verify_url is not None` is False. Fix: use a sentinel default (e.g., Form('__NOCHANGE__')) or a Form(...) with a separate 'clear' flag, or check `verify_url == ''` explicitly. Current frontend edit form sends '' when user clears field, so users cannot remove a verify URL once set."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Certificate lightbox (Dialog)", "issues": ["Radix DialogContent missing aria-describedby/Description prop -> console warning 'Missing Description or aria-describedby={undefined} for {DialogContent}'. Minor a11y issue only."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Backend: Fix PUT /api/certifications/{id} to actually clear verify_url when empty string is sent. Suggested fix: replace `if verify_url is not None:` with two Form fields (use sentinel) OR receive as `verify_url: str = Form('')` and always apply it. Alternatively, on the frontend, send a whitespace/sentinel value to clear.",
+    "Frontend (optional): add DialogDescription (visually hidden) inside cert-lightbox DialogContent to remove the a11y warning."
+  ],
+  "critical_code_review_comments": [
+    "server.py update_certification: Optional[str]=Form(None) plus `if verify_url is not None` cannot distinguish 'not sent' from 'sent as empty'; FastAPI collapses empty form values to None here, breaking clear-to-null semantics.",
+    "Certifications.jsx DialogContent missing accessible description (Radix warning).",
+    "CertManager.jsx onDrop mutates local state optimistically then re-loads via API; correct pattern.",
+    "server.py CORS uses allow_credentials=True with allow_origins='*' fallback when CORS_ORIGINS env is unset — could be an issue in prod; acceptable here since CORS_ORIGINS should be explicit."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py (added TestVerifyUrlAndReorder class with 4 new tests)"],
+  "success_rate": {"backend": "92% (12/13 new-feature-relevant tests pass; 1 legitimate bug)", "frontend": "100% (all 4 new UI features work)"},
+  "test_credentials": "Admin rdipanshu@gmail.com / CyberAdmin@2026 (from review_request)",
+  "seed_data_creation": "None. Test creates and deletes its own TEST_ certs.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Cisco original order restored to: CCNA 200-301 Network Fundamentals, Introduction to Modern AI, Introduction to Modern AI 2 (verified via API). All new features (verify_url in create form, drag-and-drop reorder, lightbox dialog, 404 page) work correctly on the frontend. Only backend bug is the empty-string clearing of verify_url on PUT.",
+  "rca of the issue": {
+    "bug": "PUT /api/certifications/{id} with form field verify_url='' does not clear the stored value.",
+    "reproduce": "1) POST /api/certifications with verify_url=https://foo.com. 2) PUT /api/certifications/{id} with form field verify_url='' (empty). 3) Response and DB still contain verify_url='https://foo.com' instead of null.",
+    "root_cause": "In FastAPI, `verify_url: Optional[str] = Form(None)` receives an empty string form value as None, so the guard `if verify_url is not None` is False and the update dict is never populated with verify_url.",
+    "mitigation": "Either (a) receive as `verify_url: Optional[str] = Form('__KEEP__')` sentinel and treat empty string as clear; or (b) always accept string default '' and apply update['verify_url'] = verify_url.strip() or None unconditionally; or (c) accept a separate boolean form field 'clear_verify_url'."
+  }
+}
