@@ -23,8 +23,13 @@ from pydantic import BaseModel
 
 mongo_url = os.environ.get('MONGO_URL', '')
 if mongo_url:
-    client = AsyncIOMotorClient(mongo_url)
-    db = client[os.environ.get('DB_NAME', 'portfolio')]
+    try:
+        client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=5000)
+        db = client[os.environ.get('DB_NAME', 'portfolio')]
+    except Exception as _db_init_err:
+        logging.getLogger(__name__).warning("MongoDB client initialization skipped: %s", _db_init_err)
+        client = None
+        db = None
 else:
     client = None
     db = None
@@ -301,22 +306,36 @@ async def logout(response: Response):
 # ---------- Pages ----------
 @api_router.get("/pages")
 async def get_pages():
-    pages = await db.pages.find({}, {"_id": 0}).to_list(50)
-    return pages
+    if db is not None:
+        try:
+            pages = await db.pages.find({}, {"_id": 0}).to_list(50)
+            if pages:
+                return pages
+        except Exception as e:
+            logger.warning("Failed to fetch pages from DB: %s", e)
+    return [{"page_id": k, **v} for k, v in DEFAULT_PAGES.items()]
 
 
 @api_router.get("/pages/{page_id}")
 async def get_page(page_id: str):
-    page = await db.pages.find_one({"page_id": page_id}, {"_id": 0})
-    if not page:
+    if page_id not in DEFAULT_PAGES:
         raise HTTPException(status_code=404, detail="Page not found")
-    return page
+    if db is not None:
+        try:
+            page = await db.pages.find_one({"page_id": page_id}, {"_id": 0})
+            if page:
+                return page
+        except Exception as e:
+            logger.warning("Failed to fetch page %s from DB: %s", page_id, e)
+    return {"page_id": page_id, **DEFAULT_PAGES[page_id]}
 
 
 @api_router.put("/pages/{page_id}")
 async def update_page(page_id: str, body: PageUpdate, user: dict = Depends(get_current_user)):
     if page_id not in DEFAULT_PAGES:
         raise HTTPException(status_code=404, detail="Unknown page")
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not configured")
     update = {"updated_at": datetime.now(timezone.utc).isoformat()}
     if body.video_url is not None:
         update["video_url"] = body.video_url
@@ -338,20 +357,41 @@ def save_upload(file: UploadFile, subdir: str) -> str:
 
 def make_pdf_thumb(file_url: str) -> Optional[str]:
     import subprocess
-    pdf_path = UPLOADS_DIR / "certs" / Path(file_url).name
-    out_base = str(pdf_path.with_suffix("")) + "_thumb"
-    r = subprocess.run(["pdftoppm", "-png", "-f", "1", "-l", "1", "-r", "80", "-singlefile", str(pdf_path), out_base], capture_output=True)
-    thumb = Path(out_base + ".png")
-    if r.returncode == 0 and thumb.exists():
-        return f"/api/uploads/certs/{thumb.name}"
+    try:
+        pdf_path = UPLOADS_DIR / "certs" / Path(file_url).name
+        out_base = str(pdf_path.with_suffix("")) + "_thumb"
+        r = subprocess.run(["pdftoppm", "-png", "-f", "1", "-l", "1", "-r", "80", "-singlefile", str(pdf_path), out_base], capture_output=True)
+        thumb = Path(out_base + ".png")
+        if r.returncode == 0 and thumb.exists():
+            return f"/api/uploads/certs/{thumb.name}"
+    except Exception as e:
+        logger.warning("Thumbnail generation skipped: %s", e)
     return None
 
 
 @api_router.get("/certifications")
 async def list_certifications(category: Optional[str] = None):
-    query = {"category": category} if category else {}
-    certs = await db.certifications.find(query, {"_id": 0}).sort([("order", 1), ("created_at", 1)]).to_list(500)
-    return certs
+    if db is not None:
+        try:
+            query = {"category": category} if category else {}
+            certs = await db.certifications.find(query, {"_id": 0}).sort([("order", 1), ("created_at", 1)]).to_list(500)
+            return certs
+        except Exception as e:
+            logger.warning("Failed to fetch certifications from DB: %s", e)
+
+    seed_file = ROOT_DIR / "seed_certs.json"
+    if seed_file.exists():
+        try:
+            import json as _json
+            with open(seed_file) as f:
+                payload = _json.load(f)
+            items = payload.get("certifications", payload) if isinstance(payload, dict) else payload
+            if category:
+                items = [c for c in (items or []) if isinstance(c, dict) and c.get("category") == category]
+            return items
+        except Exception:
+            pass
+    return []
 
 
 @api_router.post("/certifications/reorder")
@@ -687,32 +727,38 @@ async def delete_message(msg_id: str, user: dict = Depends(get_current_user)):
 # ---------- Startup ----------
 @app.on_event("startup")
 async def seed():
-    await db.users.create_index("email", unique=True)
-    await db.login_attempts.create_index("identifier")
-    admin_email = os.environ["ADMIN_EMAIL"].lower()
-    admin_password = os.environ["ADMIN_PASSWORD"]
-    existing = await db.users.find_one({"email": admin_email})
-    if existing is None:
-        await db.users.insert_one({
-            "id": str(uuid.uuid4()),
-            "email": admin_email,
-            "password_hash": hash_password(admin_password),
-            "name": "Dipanshu Rana",
-            "role": "admin",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        })
-    elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
-    for page_id, content in DEFAULT_PAGES.items():
-        if not await db.pages.find_one({"page_id": page_id}):
-            await db.pages.insert_one({"page_id": page_id, **content})
+    if db is None:
+        logger.warning("MongoDB is not configured (MONGO_URL missing). Skipping DB seed.")
+        return
 
-    # Auto-seed / self-heal certifications from bundled backend/seed_certs.json.
-    # - If DB is empty, seed everything.
-    # - If DB has cert rows whose file_url points at a missing file (typical on ephemeral filesystems
-    #   after a container restart), and seed_certs.json has a cert with the same (title, category),
-    #   replace the broken row with the seed data (which references files bundled in the repo).
     try:
+        # Verify MongoDB connection with a 5s timeout
+        await asyncio.wait_for(db.command("ping"), timeout=5.0)
+    except Exception as ping_err:
+        logger.warning("MongoDB connection failed on startup: %s. Skipping DB seed.", ping_err)
+        return
+
+    try:
+        await db.users.create_index("email", unique=True)
+        await db.login_attempts.create_index("identifier")
+        admin_email = os.environ.get("ADMIN_EMAIL", "admin@example.com").lower()
+        admin_password = os.environ.get("ADMIN_PASSWORD", "Admin123456!")
+        existing = await db.users.find_one({"email": admin_email})
+        if existing is None:
+            await db.users.insert_one({
+                "id": str(uuid.uuid4()),
+                "email": admin_email,
+                "password_hash": hash_password(admin_password),
+                "name": "Dipanshu Rana",
+                "role": "admin",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            })
+        elif not verify_password(admin_password, existing["password_hash"]):
+            await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
+        for page_id, content in DEFAULT_PAGES.items():
+            if not await db.pages.find_one({"page_id": page_id}):
+                await db.pages.insert_one({"page_id": page_id, **content})
+
         seed_file = ROOT_DIR / "seed_certs.json"
         if seed_file.exists():
             import json as _json
@@ -731,7 +777,6 @@ async def seed():
                     await db.certifications.insert_one(cert)
                 logger.info("Auto-seeded %d certifications from seed_certs.json", len(items))
             else:
-                # Self-heal: replace broken cert rows (missing files) with seed data when available.
                 healed = 0
                 async for c in db.certifications.find({}):
                     fu = c.get("file_url")
@@ -742,22 +787,23 @@ async def seed():
                     if disk_path.exists():
                         continue
                     key = (c.get("title", ""), c.get("category", ""))
-                    seed = seed_index.get(key)
-                    if not seed:
+                    seed_item = seed_index.get(key)
+                    if not seed_item:
                         continue
-                    new_cert = {k: v for k, v in seed.items() if k != "_id"}
+                    new_cert = {k: v for k, v in seed_item.items() if k != "_id"}
                     new_cert["id"] = c.get("id") or new_cert.get("id") or str(uuid.uuid4())
                     new_cert.setdefault("created_at", c.get("created_at") or datetime.now(timezone.utc).isoformat())
                     await db.certifications.replace_one({"_id": c["_id"]}, new_cert)
                     healed += 1
                 if healed:
-                    logger.info("Self-healed %d certifications with missing files (repointed to bundled URLs)", healed)
+                    logger.info("Self-healed %d certifications with missing files", healed)
     except Exception as e:
-        logger.warning("Cert seed/heal skipped: %s", e)
+        logger.warning("Startup seed/heal encountered error: %s", e)
 
 
 app.include_router(api_router)
-app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+if UPLOADS_DIR.exists():
+    app.mount("/api/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,

@@ -11,4 +11,3 @@ python-multipart>=0.0.9
 resend>=2.0.0
 requests>=2.31.0
 httpx>=0.28.0
-litellm>=1.80.0
