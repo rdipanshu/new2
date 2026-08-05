@@ -46,8 +46,8 @@ except Exception as _dir_err:
 
 # If running against a fresh persistent volume, seed it from the files bundled with the repo
 # so the site has its videos / certs / CV on first deploy.
-if UPLOADS_DIR.resolve() != BUNDLED_UPLOADS_DIR.resolve() and BUNDLED_UPLOADS_DIR.exists():
-    try:
+try:
+    if UPLOADS_DIR.resolve() != BUNDLED_UPLOADS_DIR.resolve() and BUNDLED_UPLOADS_DIR.exists():
         # Seed top-level files (e.g. CV_Dipanshu_Rana.pdf)
         for src_file in BUNDLED_UPLOADS_DIR.iterdir():
             if src_file.is_file():
@@ -62,8 +62,8 @@ if UPLOADS_DIR.resolve() != BUNDLED_UPLOADS_DIR.resolve() and BUNDLED_UPLOADS_DI
                 for f in src_dir.iterdir():
                     if f.is_file():
                         shutil.copy2(f, dst_dir / f.name)
-    except Exception as _seed_err:
-        logging.getLogger(__name__).warning("Uploads seed skipped: %s", _seed_err)
+except Exception as _seed_err:
+    logging.getLogger(__name__).warning("Uploads seed skipped: %s", _seed_err)
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -102,6 +102,8 @@ async def get_current_user(request: Request) -> dict:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
+        if db is None:
+            raise HTTPException(status_code=503, detail="Database connection unavailable")
         user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0, "password_hash": 0})
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
@@ -257,18 +259,24 @@ DEFAULT_PAGES = {
 
 # ---------- Health ----------
 @api_router.get("/health")
+@app.get("/health")
+@app.get("/api/health")
 async def health():
-    try:
-        await db.command("ping")
-        db_ok = True
-    except Exception:
-        db_ok = False
+    db_ok = False
+    if db is not None:
+        try:
+            await db.command("ping")
+            db_ok = True
+        except Exception:
+            db_ok = False
     return {"status": "ok" if db_ok else "degraded", "db": db_ok}
 
 
 # ---------- Auth routes ----------
 @api_router.post("/auth/login")
 async def login(body: LoginRequest, request: Request, response: Response):
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database connection unavailable")
     email = body.email.strip().lower()
     identifier = f"{request.client.host}:{email}"
     attempt = await db.login_attempts.find_one({"identifier": identifier})
