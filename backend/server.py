@@ -1,10 +1,9 @@
-try:
-    from dotenv import load_dotenv
-    load_dotenv(Path(__file__).parent / '.env')
-except Exception:
-    pass
-
+from dotenv import load_dotenv
 from pathlib import Path
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
 import os
 import uuid
 import logging
@@ -13,17 +12,9 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 import asyncio
-try:
-    import bcrypt
-except Exception:
-    bcrypt = None
-
+import bcrypt
 import jwt
-
-try:
-    import resend
-except Exception:
-    resend = None
+import resend
 
 from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Depends, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
@@ -84,26 +75,11 @@ logger = logging.getLogger(__name__)
 
 # ---------- Auth helpers ----------
 def hash_password(password: str) -> str:
-    if bcrypt is not None:
-        try:
-            return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-        except Exception:
-            pass
-    import hashlib
-    return "pbkdf2:" + hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), b'salt_portfolio', 100000).hex()
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    if hashed.startswith("pbkdf2:"):
-        import hashlib
-        calc = "pbkdf2:" + hashlib.pbkdf2_hmac('sha256', plain.encode('utf-8'), b'salt_portfolio', 100000).hex()
-        return calc == hashed
-    if bcrypt is not None:
-        try:
-            return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
-        except Exception:
-            pass
-    return False
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
 def create_access_token(user_id: str, email: str) -> str:
