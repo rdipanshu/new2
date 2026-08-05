@@ -1,10 +1,10 @@
+from pathlib import Path
+
 try:
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).parent / '.env')
 except Exception:
     pass
-
-from pathlib import Path
 import os
 import uuid
 import logging
@@ -691,11 +691,12 @@ async def delete_blog_post(post_id: str, user: dict = Depends(get_current_user))
 
 
 # ---------- Contact ----------
-resend.api_key = os.environ.get("RESEND_API_KEY", "")
+if resend is not None:
+    resend.api_key = os.environ.get("RESEND_API_KEY", "")
 
 
 async def send_contact_email(msg: dict):
-    if not resend.api_key:
+    if resend is None or not getattr(resend, 'api_key', None):
         return
     html = f"""
     <table style="font-family:Arial,sans-serif;max-width:600px;width:100%;border-collapse:collapse;background:#0a0a0a;color:#e4e4e7;">
