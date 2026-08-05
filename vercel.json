@@ -5,7 +5,7 @@
   "outputDirectory": "frontend/build",
   "functions": {
     "api/index.py": {
-      "includeFiles": "api/**,backend/**"
+      "includeFiles": "backend/**"
     },
     "index.py": {
       "includeFiles": "backend/**"

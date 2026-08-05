@@ -3,18 +3,17 @@ import os
 import traceback
 from pathlib import Path
 
-# Add search paths so `from server import app` works
-current_dir = Path(__file__).parent
-root_dir = current_dir.parent
+# Vercel bundles backend/** via includeFiles in vercel.json.
+# On Lambda the layout is /var/task/api/index.py and /var/task/backend/server.py
+root_dir = Path(__file__).parent.parent
 backend_dir = root_dir / "backend"
 
-for p in [str(current_dir), str(backend_dir), str(root_dir)]:
+for p in [str(backend_dir), str(root_dir)]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
 # Attempt to import the real app; if ANYTHING fails, provide a
-# zero-dependency ASGI fallback that surfaces the traceback as JSON
-# instead of crashing the Vercel function with a generic 500.
+# zero-dependency ASGI fallback that surfaces the traceback as JSON.
 try:
     from server import app
     handler = app
@@ -22,7 +21,7 @@ except Exception:
     _boot_error = traceback.format_exc()
 
     async def app(scope, receive, send):
-        """Minimal ASGI fallback – no FastAPI needed."""
+        """Minimal ASGI fallback - no third-party deps needed."""
         import json
         if scope["type"] == "lifespan":
             msg = await receive()
@@ -32,20 +31,17 @@ except Exception:
             return
         body = json.dumps({
             "status": "boot_error",
-            "message": "The serverless function failed to import server.py",
+            "message": "Failed to import backend/server.py",
             "traceback": _boot_error,
-            "env_keys": sorted(os.environ.keys()),
+            "sys_path": sys.path,
+            "backend_dir_exists": backend_dir.exists(),
+            "backend_dir_contents": os.listdir(str(backend_dir)) if backend_dir.exists() else [],
         }).encode()
         await send({
             "type": "http.response.start",
             "status": 500,
-            "headers": [
-                [b"content-type", b"application/json"],
-            ],
+            "headers": [[b"content-type", b"application/json"]],
         })
-        await send({
-            "type": "http.response.body",
-            "body": body,
-        })
+        await send({"type": "http.response.body", "body": body})
 
     handler = app
